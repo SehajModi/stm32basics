@@ -18,8 +18,6 @@
 
 #include <stdint.h>
 
-#include <stdint.h>
-
 #define RCC_AHB1ENR (*(volatile uint32_t*)0x40023830)
 #define GPIOA_MODER (*(volatile uint32_t*)0x40020000)
 #define GPIOA_ODR   (*(volatile uint32_t*)0x40020014)
@@ -33,6 +31,6 @@ int main(void)
     while (1)
     {
         GPIOA_ODR ^= (1 << 5);           // toggle PA5 (LD2)
-        for (volatile int i = 0; i < 1000000; i++);  // crude delay
+        for (volatile int i = 0; i < 500000; i++);  // crude delay
     }
 }

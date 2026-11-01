@@ -56,7 +56,7 @@ int main(void)
 
     while (1)
     {
-        uart_send_string("minmol2026!!\r\n");
+        uart_send_string("hello\r\n");
         for (volatile int i = 0; i < 500000; i++);
     }
 }

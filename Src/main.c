@@ -19,18 +19,44 @@
 #include <stdint.h>
 
 #define RCC_AHB1ENR (*(volatile uint32_t*)0x40023830)
+#define RCC_APB1ENR (*(volatile uint32_t*)0x40023840)
 #define GPIOA_MODER (*(volatile uint32_t*)0x40020000)
-#define GPIOA_ODR   (*(volatile uint32_t*)0x40020014)
+#define GPIOA_AFRL  (*(volatile uint32_t*)0x40020020)
+#define USART2_SR   (*(volatile uint32_t*)0x40004400)
+#define USART2_DR   (*(volatile uint32_t*)0x40004404)
+#define USART2_BRR  (*(volatile uint32_t*)0x40004408)
+#define USART2_CR1  (*(volatile uint32_t*)0x4000440C)
+
+void uart_send_char(char c)
+{
+    while (!(USART2_SR & (1<<7)));    // wait until TXE (transmit register empty)
+    USART2_DR = c;                    // writing the byte starts sending it
+}
+
+void uart_send_string(const char *s)
+{
+    while (*s)
+        uart_send_char(*s++);
+}
 
 int main(void)
 {
-    RCC_AHB1ENR |= (1 << 0);             // turn on GPIOA's clock
-    GPIOA_MODER &= ~(3 << (5 * 2));      // clear PA5's mode bits
-    GPIOA_MODER |=  (1 << (5 * 2));      // set PA5 as output
+    RCC_AHB1ENR |= (1<<0);            // clock: GPIOA
+    RCC_APB1ENR |= (1<<17);           // clock: USART2
+
+    GPIOA_MODER &= ~(3<<(2*2));       // PA2: clear
+    GPIOA_MODER |=  (2<<(2*2));       // PA2: alternate function (10)
+
+    GPIOA_AFRL  &= ~(0xF<<(2*4));     // PA2: clear its 4-bit AF field
+    GPIOA_AFRL  |=  (7<<(2*4));       // PA2: AF7 = USART2_TX
+
+    USART2_BRR  = 0x008B;             // 115200 baud at 16 MHz
+    USART2_CR1 |= (1<<3);             // TE: transmitter enable
+    USART2_CR1 |= (1<<13);            // UE: USART enable
 
     while (1)
     {
-        GPIOA_ODR ^= (1 << 5);           // toggle PA5 (LD2)
-        for (volatile int i = 0; i < 500000; i++);  // crude delay
+        uart_send_string("minmol2026!!\r\n");
+        for (volatile int i = 0; i < 500000; i++);
     }
 }

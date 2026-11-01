@@ -27,50 +27,53 @@
 #define USART2_DR   (*(volatile uint32_t*)0x40004404)
 #define USART2_BRR  (*(volatile uint32_t*)0x40004408)
 #define USART2_CR1  (*(volatile uint32_t*)0x4000440C)
+#define SYST_CTRL   (*(volatile uint32_t*)0xE000E010)
+#define SYST_LOAD   (*(volatile uint32_t*)0xE000E014)
+#define SYST_VAL    (*(volatile uint32_t*)0xE000E018)
 
 void uart_send_char(char c)
 {
-    while (!(USART2_SR & (1<<7)));    // wait for TXE
+    while (!(USART2_SR & (1<<7)));
     USART2_DR = c;
 }
 
-char uart_read_char(void)
+void uart_send_string(const char *s)
 {
-    while (!(USART2_SR & (1<<5)));    // wait for RXNE (byte received)
-    return (char)USART2_DR;           // reading DR also clears RXNE
+    while (*s) uart_send_char(*s++);
+}
+
+void delay_ms(uint32_t ms)
+{
+    SYST_LOAD = 16000 - 1;            // 16000 ticks = 1 ms at 16 MHz
+    SYST_VAL  = 0;                    // clear the counter
+    SYST_CTRL = (1<<0) | (1<<2);      // enable + CPU clock, no interrupt
+
+    while (ms--)
+        while (!(SYST_CTRL & (1<<16)));   // wait for the 1 ms flag (reading clears it)
+
+    SYST_CTRL = 0;                    // stop
 }
 
 int main(void)
 {
-    RCC_AHB1ENR |= (1<<0);            // clock: GPIOA
-    RCC_APB1ENR |= (1<<17);           // clock: USART2
+    RCC_AHB1ENR |= (1<<0);
+    RCC_APB1ENR |= (1<<17);
 
-    GPIOA_MODER &= ~(3<<(5*2));       // PA5 output (LED)
+    GPIOA_MODER &= ~(3<<(5*2));       // PA5 output
     GPIOA_MODER |=  (1<<(5*2));
 
-    GPIOA_MODER &= ~(3<<(2*2));       // PA2 alternate function (TX)
+    GPIOA_MODER &= ~(3<<(2*2));       // PA2 alternate function
     GPIOA_MODER |=  (2<<(2*2));
-    GPIOA_MODER &= ~(3<<(3*2));       // PA3 alternate function (RX)
-    GPIOA_MODER |=  (2<<(3*2));
-
-    GPIOA_AFRL  &= ~(0xF<<(2*4));     // PA2 = AF7
+    GPIOA_AFRL  &= ~(0xF<<(2*4));
     GPIOA_AFRL  |=  (7<<(2*4));
-    GPIOA_AFRL  &= ~(0xF<<(3*4));     // PA3 = AF7
-    GPIOA_AFRL  |=  (7<<(3*4));
 
-    USART2_BRR  = 0x008B;             // 115200 baud at 16 MHz
-    USART2_CR1 |= (1<<3);             // TE: transmitter enable
-    USART2_CR1 |= (1<<2);             // RE: receiver enable
-    USART2_CR1 |= (1<<13);            // UE: USART enable
+    USART2_BRR  = 0x008B;
+    USART2_CR1 |= (1<<3) | (1<<13);   // TE + UE
 
     while (1)
     {
-        char c = uart_read_char();
-        uart_send_char(c);            // echo it back
-
-        if (c == '1')
-            GPIOA_ODR |= (1<<5);      // LED on
-        else if (c == '0')
-            GPIOA_ODR &= ~(1<<5);     // LED off
+        GPIOA_ODR ^= (1<<5);
+        uart_send_string("tick\r\n");
+        delay_ms(500);
     }
 }

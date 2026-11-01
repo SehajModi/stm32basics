@@ -53,6 +53,36 @@ void delay_ms(uint32_t ms)
 
     SYST_CTRL = 0;                    // stop
 }
+void uart_send_int(int32_t n)
+{
+    char buf[11];
+    int i = 0;
+    uint32_t u = (uint32_t)n;
+
+    if (n < 0) {
+        uart_send_char('-');
+        u = 0 - u;                    // make it positive
+    }
+    if (u == 0) {
+        uart_send_char('0');
+        return;
+    }
+    while (u > 0) {
+        buf[i++] = '0' + (u % 10);    // last digit, as a character
+        u /= 10;                      // drop the last digit
+    }
+    while (i--)
+        uart_send_char(buf[i]);       // digits came out backwards, so send in reverse
+}
+
+void uart_send_hex8(uint8_t v)
+{
+    const char *h = "0123456789ABCDEF";
+    uart_send_string("0x");
+    uart_send_char(h[v >> 4]);        // high 4 bits
+    uart_send_char(h[v & 0xF]);       // low 4 bits
+}
+
 
 int main(void)
 {
@@ -70,10 +100,17 @@ int main(void)
     USART2_BRR  = 0x008B;
     USART2_CR1 |= (1<<3) | (1<<13);   // TE + UE
 
+    int32_t count = -3;
+
     while (1)
     {
-        GPIOA_ODR ^= (1<<5);
-        uart_send_string("tick\r\n");
+        uart_send_string("count = ");
+        uart_send_int(count);
+        uart_send_string("  hex of low byte = ");
+        uart_send_hex8((uint8_t)count);
+        uart_send_string("\r\n");
+
+        count++;
         delay_ms(500);
     }
 }
